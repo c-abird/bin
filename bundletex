@@ -1,0 +1,25 @@
+#!/bin/sh
+
+file=$1
+dir=$(dirname $file)
+basename=$(basename $file)
+plainname=${basename%%.*}
+
+echo $dir
+echo $basename
+echo $plainname
+
+cp $file $file.backup
+
+sed -i "1s;^;\\\\RequirePackage{snapshot}\n\\\\pdfoutput=1\n;" $file
+
+cd $dir
+lualatex $plainname
+bibtex $plainname
+lualatex $plainname
+lualatex $plainname
+
+bundledoc --config=/usr/share/texlive/texmf-dist/tex/latex/bundledoc/texlive-unix.cfg $plainname.dep
+
+cd -
+mv $file.backup $file
