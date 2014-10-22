@@ -1,0 +1,65 @@
+#!/usr/bin/python
+
+# TODO check file extensions of files to copy (bib, pdf, tex ...)
+# TODO copy files from input and include
+# XXX really strip all comments?
+
+from optparse import OptionParser
+import os
+import sys
+import re
+import itertools as it
+import shutil
+
+# set up option parser
+parser = OptionParser()
+parser.add_option("-o", "--output-dir", type="string", dest="output_dir", help="Output Directory", default=None)
+(options, args) = parser.parse_args(sys.argv)
+
+source_file    = os.path.abspath(args[1])
+path, fullname = os.path.split(source_file)
+plainname, _   = os.path.splitext(fullname)
+
+# read complete source file
+with open(source_file, 'r') as f: output = f.read()
+
+# replace tikzpicture environments with compiled images
+tikzpicture = re.compile(r"\\begin{tikzpicture}(.*?)\\end{tikzpicture}", re.DOTALL)
+cnt = it.count()
+output = re.sub(tikzpicture, lambda x: '\includegraphics{%s-figure%d.pdf}' % (plainname, next(cnt)), output)
+
+# get tikz prefix
+tikz_prefix = ""
+match = re.search(r"\\tikzexternalize\[prefix=(.*?)\]", output)
+if match is not None:
+  tikz_prefix = match.group(1)
+
+# remove sections marked as external
+external_section = re.compile(r"BEGIN EXTERNAL.*?\n(.*?)\n.*?END EXTERNAL", re.DOTALL)
+output = re.sub(external_section, '', output)
+
+# remove all comments that span whole lines
+output = re.sub(r'(?m)^\w*%.*\n?', '', output)
+
+# write output
+if options.output_dir == None:
+  print output
+else:
+  # create output path
+  output_path = os.path.join(os.getcwd(), options.output_dir)
+  if os.path.exists(output_path): sys.exit("Path already exists!")
+  os.makedirs(output_path)
+
+  # write tex file
+  with open(os.path.join(output_path, fullname), "w") as output_file:
+    output_file.write(output)
+
+  # copy all included figure
+  for figure_file in re.findall(r"\\includegraphics{(.*?)}", output):
+    shutil.copyfile(os.path.join(path, tikz_prefix, figure_file), os.path.join(output_path, figure_file))
+
+  # Copy refs
+  for bib_files in re.findall(r"\\bibliography{(.*?)}", output):
+    for bib_file in bib_files.split(","):
+      shutil.copyfile(os.path.join(path, "%s.bib" % bib_file),
+                      os.path.join(output_path, "%s.bib" % bib_file))
