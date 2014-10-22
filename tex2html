@@ -1,0 +1,10 @@
+#!/bin/bash
+
+src=$1
+tmp=/tmp/pandow-$RANDOM.html
+trg=$2
+title="Micromagnetics"
+
+pandoc --number-sections --base-header-level 1 --reference-links --mathjax -t html5 --bibliography refs.bib $src -o $tmp
+clean_pandoc_tex -t $title $tmp $trg
+rm $tmp

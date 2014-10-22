@@ -1,0 +1,120 @@
+#!/usr/bin/python
+
+from optparse import OptionParser
+from bs4 import BeautifulSoup
+from sys import argv
+import re
+
+# parse command line arguments
+parser = OptionParser()
+parser.add_option("-t", "--title", type="string", dest="title", help="Page title", default="Page")
+(options, args) = parser.parse_args(argv)
+source_file = args[1]
+target_file = args[2]
+
+# open html file
+soup = BeautifulSoup(open(source_file), "html.parser")
+
+anchors = []
+
+# tables
+table_counter = 0
+for table in soup.find_all("table"):
+  table_counter += 1
+  caption = table.find_next_sibling('p')
+  table_id = caption.get_text()[1:-1]
+  table_id_new = table_id.replace(":", "-")
+  table['id']  = table_id_new
+
+  #caption.decompose()
+
+  label = soup.new_tag("span")
+  label['class'] = "label"
+  label.string = "Table %d:" % table_counter
+
+  caption['class'] = "caption"
+  caption.clear()
+  caption.append(label)
+
+  anchors.append({
+    'id': table_id,
+    'id_new': table_id_new,
+    'num': table_counter
+  })
+
+# image captions
+fig_counter = 0
+for image in soup.find_all("img"):
+  fig_counter += 1
+  img_id     = image.next_element[2:-1]
+  img_id_new = img_id.replace(":", "-")
+
+  image.parent['id'] = img_id_new
+  image.parent['class'] = "figure"
+  del image['title']
+
+  label = soup.new_tag("span")
+  label['class'] = "label"
+  label.string = "Figure %d:" % fig_counter
+
+  image.next_element.replace_with('')
+  image.parent.append(label)
+  image.parent.append(image.get('alt', ''))
+
+  anchors.append({
+    'id': img_id,
+    'id_new': img_id_new,
+    'num': fig_counter
+  })
+
+# section links
+for section in soup.find_all(re.compile("^h[1-6]")):
+  sec_id     = section.get('id')
+  sec_id_new = sec_id.replace(":", "-")
+
+  if not sec_id_new[0:4] == "sec-": continue
+
+  section['id'] = sec_id_new
+  section_number = section.find("span", "header-section-number")
+  anchors.append({
+    'id': sec_id,
+    'id_new': sec_id_new,
+    'num': section_number.get_text()
+  })
+
+html = soup.prettify("utf-8").decode('utf-8')
+
+############
+# HTML MODS
+############
+
+# set links for tables, figures and sections
+for a in anchors:
+  ref  = u'[%s]'% a['id']
+  link = u'<a href="#%s">%s</a>' % (a['id_new'], a['num'])
+  html = html.replace(ref, link)
+
+# proper align environments
+html = html.replace('\\[\\begin{aligned}', '\\begin{align}')
+html = html.replace('\\end{aligned}\\]', '\\end{align}')
+
+# fix image paths
+html = html.replace('src="figures', 'src="/images')
+html = html.replace('.png"', '.svg"')
+
+# shift headings
+html = html.replace("<h4", "<h5")
+html = html.replace("<h3", "<h4")
+html = html.replace("<h2", "<h3")
+html = html.replace("<h1", "<h2")
+
+html = html.replace("</h4", "</h5")
+html = html.replace("</h3", "</h4")
+html = html.replace("</h2", "</h3")
+html = html.replace("</h1", "</h2")
+
+# jekyll headers
+html = "---\nlayout: page\ntitle: " + options.title + "\nposition: 2\n---\n{% raw %}\n" + html + "\n{% endraw %}"
+
+with open(target_file, "w") as file:
+  file.write(html.encode('utf-8'))
