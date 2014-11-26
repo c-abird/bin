@@ -1,0 +1,82 @@
+#!/usr/bin/python
+
+import vtk
+import vtk.util.numpy_support as vnp
+import numpy as np
+from optparse import OptionParser
+
+from sys import argv
+import os
+import itertools as it
+from math import sqrt
+
+
+# set up option parser
+parser = OptionParser()
+#parser.add_option("-d", "--direction", type="int", dest="direction", help="Slice normal direction", default=2)
+# TODO use vtkRotationFilter to allow choice of direction
+parser.add_option("-s", "--slice", type="float", dest="slice", help="Slice Position", default=0.0)
+parser.add_option("-i", "--interpolate", dest="interpolate", help="Interpolate to grid 10x10")
+parser.add_option("-S", "--scale", dest="scale", help="scale factor", type="float", default=1.0)
+(options, args) = parser.parse_args(argv)
+
+# TODO
+options.quiver_scale = 0.95
+
+for filename in args[1:]:
+  if not options.interpolate: parser.error("Interpolation not given")
+  shape = tuple(map(lambda x: int(x), options.interpolate.split('x')))
+
+  #reader = vtk.vtkXMLRectilinearGridReader() 
+  reader = vtk.vtkXMLUnstructuredGridReader()
+  reader.SetFileName(filename)
+  reader.Update()
+
+  # for rendering input file:
+  mapper = vtk.vtkDataSetMapper()
+  mapper.SetInput(reader.GetOutput())
+
+  bounds  = mapper.GetBounds()
+  origin  = list(bounds[::2])
+  origin[2] = options.slice
+
+  #spacing = map(lambda x: (x[1] - x[0])/x[2], zip(bounds[0::2], bounds[1::2], shape ))
+  spacing = [
+      (bounds[1] - bounds[0]) / shape[0],
+      (bounds[3] - bounds[2]) / shape[1]
+  ]
+
+  idata = vtk.vtkImageData()
+  idata.SetExtent(0, shape[0], 0, shape[1], 0, 0)
+  idata.SetOrigin(origin[0], origin[1], origin[2])
+  idata.SetSpacing(spacing[0], spacing[1], 1.0)
+
+  probe = vtk.vtkProbeFilter()
+  probe.SetInput(idata)
+  probe.SetSource(reader.GetOutput())
+  probe.Update()
+
+  m = vnp.vtk_to_numpy(probe.GetOutput().GetPointData().GetScalars()).reshape((shape[1]+1, shape[0]+1))
+  m = np.swapaxes(m, 0, 1)
+
+  # Scaling
+  scale = (
+    spacing[0] * options.scale,
+    spacing[1] * options.scale
+  )
+
+  # Write file
+  basename = os.path.splitext(os.path.basename(filename))[0]
+  f = open("%s.grid" % basename, 'w')
+  f.write("x_0 x_1 f(x)\n")
+  for i, j in it.product(range(0,m.shape[0]), range(0,m.shape[1])):
+    if j == 0: f.write("\n")
+    value     = m[i,j]
+    values = (
+        i * scale[0],
+        j * scale[1],
+        value
+    )
+    f.write("%f %f %f\n" % values)
+
+  f.close()
