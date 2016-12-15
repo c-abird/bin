@@ -1,0 +1,2 @@
+#!/bin/sh
+chromium-browser --app=https://mail.google.com/mail/mu/mp/90/?mui=ca

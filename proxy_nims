@@ -1,0 +1,3 @@
+#!/bin/sh
+
+proxy_on wwwout.nims.go.jp 8888

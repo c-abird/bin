@@ -1,0 +1,40 @@
+#!/usr/bin/python
+
+import vtk
+import vtk.util.numpy_support as vnp
+import numpy as np
+import dolfin
+import argparse
+
+# parse command line options
+parser = argparse.ArgumentParser(description='Compute mesh quality')
+parser.add_argument('mesh', help = 'mesh file (XML)')
+args = parser.parse_args()
+
+# load mesh
+mesh = dolfin.Mesh(args.mesh)
+
+# create VTK grid
+grid = vtk.vtkUnstructuredGrid()
+
+# initialize grid points
+points = vtk.vtkPoints()
+points.SetData(vnp.numpy_to_vtk(mesh.coordinates(), deep=True))
+grid.SetPoints(points)
+
+# initialize grid cells
+cell_data = np.zeros((mesh.size(3), 5), dtype=np.int64)
+cell_data[:,0] = 4
+cell_data[:,1:] = mesh.cells()
+
+cells = vtk.vtkCellArray()
+cells.SetCells(mesh.size(3), vnp.numpy_to_vtkIdTypeArray(cell_data.flatten(), deep=True))
+grid.SetCells(10, cells)
+
+# compute quality
+quality = vtk.vtkMeshQuality()
+quality.SetInput(grid)
+quality.SetTetQualityMeasureToRadiusRatio()
+quality.Update()
+
+print vnp.vtk_to_numpy(quality.GetOutput().GetCellData().GetArray("Quality")).max()

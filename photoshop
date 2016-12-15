@@ -1,0 +1,2 @@
+#!/bin/sh
+wine "/home/claas/.wine/drive_c/Program Files (x86)/Adobe/Adobe Photoshop CS2/photoshop.exe"

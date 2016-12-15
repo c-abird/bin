@@ -1,0 +1,3 @@
+#!/bin/bash
+quoted_args="$(printf " %q" "$@")"
+docker run -it -v $(pwd):/sim -v ~/.instant:/home/fenics/.instant -e DEV_UID=$(id -u) -e DEV_GID=$(id -g) -w /sim suessco/magnum.fe "ipython $quoted_args"

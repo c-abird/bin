@@ -1,0 +1,134 @@
+import vtk
+from sys import argv
+
+try:
+	filename = argv[1]
+	xCoord = float(argv[2])
+	yCoord = float(argv[3])
+	zCoord = float(argv[4])
+except:
+	print 'Usage: Interpolation.py filnename.inp coordx coordy coordz\n'
+	print 'The magnetizatoin at point coordx, coordy and coordz are interpolated'
+	print 'The result is appended in the file output.dat'
+	print 'coordx coordy coorz datax datay dataz'
+	exit()
+
+reader = vtk.vtkXMLRectilinearGridReader() 
+reader.SetFileName(filename)
+reader.Update()
+
+# for rendering input file:
+mapper = vtk.vtkDataSetMapper()
+mapper.SetInput(reader.GetOutput())
+actor = vtk.vtkActor()
+actor.SetMapper(mapper)
+
+# Create point source to use for the probe.
+#point = vtk.vtkPointSource()
+#point.SetNumberOfPoints(1000000)
+#point.SetRadius(0.3e-6)
+
+#point=vtk.vtkPlaneSource()
+#point=vtk.vtkCubeSource()
+#point.SetNormal(0.,0.,1.0)
+#point.SetXResolution(9600)
+#point.SetYResolution(2048)
+#point.SetXLength(8.0e-9 -1e-10)
+#point.SetYLength(1.2e-9 -1e-10)
+#point.SetZLength(5e-9 -1e-10)
+
+
+xlength=800.0e-9/2.
+ylength=9600e-9/2.
+zlength=5e-11
+
+point=vtk.vtkImageData()
+xNum=2048
+xNum=50
+yNum=9600
+yNum=50
+zNum=1
+#point=vtk.vtkSmartPointer
+xcenter=xCoord/2.
+ycenter=yCoord/2.
+zcenter=zCoord/2.
+point.SetDimensions(xNum,yNum,zNum)
+#point.SetOrigin(xCoord,yCoord,zCoord)
+xorigin=xcenter-xlength/2.
+yorigin=ycenter-ylength/2.
+zorigin=zcenter-zlength/2.
+point.SetOrigin(xorigin,yorigin,zorigin)
+
+point.SetSpacing(xlength/xNum,ylength/yNum,zlength/zNum)
+print point
+# point.SetNumberOfPoints(1000)
+
+# Set the Point Coordinates and create the probe filter. For
+# vtkProbeFilter, the probe line is the input, and the underlying data
+# set is the source.
+
+#cell2point = vtk.vtkCellDataToPointData()
+#cell2point.SetInputConnection(reader.GetOutputPort())
+#cell2point.PassCellDataOn()
+
+
+#point.SetCenter(xCoord,yCoord,zCoord)
+pointProbe = vtk.vtkProbeFilter()
+#pointProbe.SetInputConnection(point.GetOutputPort())
+pointProbe.SetInput(point)
+
+#pointProbe.SetSource(cell2point.GetOutput())
+pointProbe.SetSource(reader.GetOutput())
+pointProbe.Update()
+#print pointProbe()
+# apply clac a glyph filer:
+
+#calc = vtk.vtkArrayCalculator()
+#calc.SetInput(pointProbe.GetOutput())
+#calc.SetAttributeModeToUsePointData()
+#calc.AddVectorVariable("dataXYZ","M")
+#calc.AddScalarVariable("dataY","M", 1)
+#calc.AddScalarVariable("dataZ","M", 2)
+#calc.SetFunction("dataXYZ")
+#calc.SetResultArrayName("Result")
+#calc.Update()
+
+# calculate result:
+#pointProbe.PrintSelf()
+#print pointProbe.GetOutput().GetPointData().GetArray(0)
+naverage = pointProbe.GetOutput().GetPointData().GetArray(0).GetNumberOfTuples()
+print naverage
+#print pointProbe.GetOutput().GetPointData().GetArray(0).GetTuple3(0)
+temp=0
+for i in range(0,naverage):
+ temp = temp+ pointProbe.GetOutput().GetPointData().GetArray(0).GetComponent(i,0)
+xResult=temp/naverage
+
+temp=0
+for i in range(0,naverage):
+ temp = temp+ pointProbe.GetOutput().GetPointData().GetArray(0).GetComponent(i,1)
+yResult=temp/naverage
+
+temp=0
+for i in range(0,naverage):
+ temp = temp+ pointProbe.GetOutput().GetPointData().GetArray(0).GetComponent(i,2)
+zResult=temp/naverage
+
+
+
+
+#xResult = (xResult[0] + xResult[1])/2.0
+#yResult = calc.GetOutput().GetPointData().GetArray(1).GetRange()
+#yResult = (yResult[0] + yResult[1])/2.0
+#zResult = calc.GetOutput().GetPointData().GetArray(2).GetRange()
+#zResult = (zResult[0] + zResult[1])/2.0
+
+
+print '\nNormalized Magnetization in x-direction = ' + str(xResult)
+print 'Normalized Magnetization in y-direction = ' + str(yResult)
+print 'Normalized Magnetization in z-direction = ' + str(zResult) + '\n'
+
+handle = open("output.dat","w");
+handle.write(argv[2]+" "+argv[3]+" "+argv[4] + " "+str(xResult)+" "+ str(yResult)+" "+str(zResult)+"\n");
+handle.close()
+
